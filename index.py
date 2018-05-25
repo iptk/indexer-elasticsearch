@@ -12,7 +12,9 @@ import os
 
 api_endpoint = os.environ.get("API_ENDPOINT", "http://localhost").rstrip('/')
 elasticsearch_host = os.environ.get("ELASTICSEARCH_HOST", "http://localhost").rstrip('/')
+redis_host = os.environ.get("REDIS_HOST", None)
 es = Elasticsearch(elasticsearch_host)
+    
 
 def handle_dataset(dataset_id):
     dataset_url = f"{api_endpoint}/v3/datasets/{dataset_id}"
@@ -81,6 +83,13 @@ def index_metadata(dataset_id):
 
 seen_ids = set() # Only try once per dataset
 current_idx = 0
+if redis_host:
+    import redis
+    r = redis.StrictRedis(redis_host, decode_responses=True)
+    saved_idx = r.get("current_elasticsearch_index")
+    if saved_idx:
+        current_idx = saved_idx
+print(f"Starting at index {current_idx}")
 while True:
     params = {"start": current_idx, "per_page": 10}
     logs = requests.get(f"{api_endpoint}/v3/logs/dataset_changes", params=params).json()
@@ -91,5 +100,6 @@ while True:
             index_metadata(dataset_id)
             seen_ids.add(dataset_id)
     current_idx = logs["range"]["end"]
+    r.set("current_elasticsearch_index", current_idx)
     if logs["range"]["end"] == logs["range"]["max"]:
         time.sleep(10)
