@@ -95,8 +95,7 @@ while True:
     logs = requests.get(f"{api_endpoint}/v3/logs/dataset_changes", params=params).json()
     for entry in logs["entries"]:
         dataset_id = entry.get("dataset_id", None)
-        action = entry.get("action", "metadata_update")
-        if action == "metadata_update" and dataset_id not in seen_ids:
+        if dataset_id not in seen_ids):
             index_metadata(dataset_id)
             seen_ids.add(dataset_id)
     current_idx = logs["range"]["end"]
