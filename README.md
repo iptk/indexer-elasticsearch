@@ -3,6 +3,7 @@ This metadata indexer uses the IPTK web API to watch for new datasets through th
 
 ## Usage
 <a href="https://hub.docker.com/r/iptk/indexer-elasticsearch"><img src="https://img.shields.io/docker/build/iptk/indexer-elasticsearch.svg"></a>
+
 Either use the *index.py* script directly, which requires Python 3.6 and the _elasticsearch_ and _requests_ packages, or use the provided Docker image.
 
 ## Configuration
