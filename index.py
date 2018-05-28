@@ -73,11 +73,14 @@ def index_metadata(dataset_id):
     for metadata_id in metadatasets:
         index_name = f"iptk-meta-{metadata_id}"
         metadata_url = f"{meta_url}/{metadata_id}"
-        response = requests.get(metadata_url)
-        metadata = response.json()
         try:
+            response = requests.get(metadata_url)
+            metadata = response.json()
             es.index(index=index_name, doc_type="metadata", id=dataset_id, body=metadata)
-        except:
+        except Exception as e:
+            print(f"Could not read metadata {metadata_id} for dataset {dataset_id}: {e}", file=sys.stderr)
+            if response and response.text:
+                print(response.text)
             return False
     return True
 
@@ -99,6 +102,7 @@ while True:
             index_metadata(dataset_id)
             seen_ids.add(dataset_id)
     current_idx = logs["range"]["end"]
-    r.set("current_elasticsearch_index", current_idx)
+    if redis_host:
+        r.set("current_elasticsearch_index", current_idx)
     if logs["range"]["end"] == logs["range"]["max"]:
         time.sleep(10)
