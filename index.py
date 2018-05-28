@@ -1,58 +1,26 @@
 """
-Watches an IPTK HTTP API endpoint for new datasets and extracts DICOM metadata
-if the dataset contains *.dcm files. If multiple dcm files are present in the
-dataset, only one will be indexed.
+Lists all existing metadata in all datasets within a single dataset store and 
+exports them to an Elasticsearch host. The Elasticsearch host can be configured
+through the ELASTICSEARCH_HOST environment variable, the dataset store location
+can be specified by DATASETS_PATH.
 """
 
-from json.decoder import JSONDecodeError
+from iptk import DatasetStore
 from elasticsearch import Elasticsearch
-import requests
 import sys
 import os
+import re
 
-api_endpoint = os.environ.get("API_ENDPOINT", "http://localhost").rstrip('/')
 elasticsearch_host = os.environ.get("ELASTICSEARCH_HOST", "http://localhost").rstrip('/')
-redis_host = os.environ.get("REDIS_HOST", None)
+datasets_path = os.environ.get("DATASETS_PATH", "/datasets")
+
 es = Elasticsearch(elasticsearch_host)
+ds = DatasetStore(datasets_path)
 
-def index_metadata(dataset_id):
-    dataset_url = f"{api_endpoint}/v3/datasets/{dataset_id}"
-    meta_url = f"{dataset_url}/meta"
-    metadatasets = requests.get(meta_url).json().get("metadatasets", [])
-    for metadata_id in metadatasets:
-        index_name = f"iptk-meta-{metadata_id}"
-        metadata_url = f"{meta_url}/{metadata_id}"
-        try:
-            response = requests.get(metadata_url)
-            metadata = response.json()
-            es.index(index=index_name, doc_type="metadata", id=dataset_id, body=metadata)
-        except Exception as e:
-            print(f"Could not read metadata {metadata_id} for dataset {dataset_id}: {e}", file=sys.stderr)
-            if response and response.text:
-                print(response.text)
-            return False
-    return True
-
-seen_ids = set() # Only try once per dataset
-current_idx = 0
-if redis_host:
-    import redis
-    r = redis.StrictRedis(redis_host, decode_responses=True)
-    saved_idx = r.get("current_elasticsearch_index")
-    if saved_idx:
-        current_idx = saved_idx
-print(f"Starting at index {current_idx}")
-
-while True:
-    params = {"start": current_idx, "per_page": 10}
-    logs = requests.get(f"{api_endpoint}/v3/logs/dataset_changes", params=params).json()
-    for entry in logs["entries"]:
-        dataset_id = entry.get("dataset_id", None)
-        if dataset_id not in seen_ids:
-            index_metadata(dataset_id)
-            seen_ids.add(dataset_id)
-    current_idx = logs["range"]["end"]
-    if redis_host:
-        r.set("current_elasticsearch_index", current_idx)
-    if logs["range"]["end"] == logs["range"]["max"]:
-        time.sleep(10)
+for dataset in ds.list_datasets():
+    for spec_id in dataset.metadata_specs():
+        if re.match("^[0-9a-z]{40}$", spec_id):
+            index_name = f"iptk-meta-{spec_id}"
+            ms = dataset.metadata_set(spec_id)
+            metadata = dict(ms)
+            es.index(index=index_name, doc_type="metadata", id=dataset.identifier, body=metadata)
