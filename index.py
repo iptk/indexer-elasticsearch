@@ -14,11 +14,17 @@ import re
 
 elasticsearch_host = os.environ.get("ELASTICSEARCH_HOST", "http://localhost").rstrip('/')
 datasets_path = os.environ.get("DATASETS_PATH", "/datasets")
+shuffle_datasets = "SHUFFLE_DATASETS" in os.environ
 
 es = Elasticsearch(elasticsearch_host)
 ds = DatasetStore(datasets_path)
+datasets = ds.list_datasets()
 
-for dataset in ds.list_datasets():
+if shuffle_datasets:
+    datasets = list(datasets)
+    shuffle(datasets)
+    
+for dataset in datasets:
     for spec_id in dataset.metadata_specs():
         if re.match("^[0-9a-z]{40}$", spec_id):
             index_name = f"iptk-meta-{spec_id}"
@@ -28,5 +34,5 @@ for dataset in ds.list_datasets():
                 es.index(index=index_name, doc_type="metadata", id=dataset.identifier, body=metadata)
             except RequestError:
                 # Issue a warning if indexing fails, keep going.
-                print(f"Could not index metadata {spec_id} for dataset {dataset.identifier}")
+                print(f"Could not index metadata {spec_id} for dataset {dataset.identifier}", file=sys.stderr)
                 pass
