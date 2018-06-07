@@ -7,7 +7,6 @@ can be specified by DATASETS_PATH.
 
 from iptk import DatasetStore
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import RequestError
 from random import shuffle
 import sys
 import os
@@ -33,7 +32,8 @@ for dataset in datasets:
             metadata = dict(ms)
             try:
                 es.index(index=index_name, doc_type="metadata", id=dataset.identifier, body=metadata)
-            except RequestError:
+            except Exception as e:
                 # Issue a warning if indexing fails, keep going.
                 print(f"Could not index metadata {spec_id} for dataset {dataset.identifier}", file=sys.stderr)
+                print(e)
                 pass
