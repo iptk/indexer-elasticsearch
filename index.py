@@ -8,6 +8,7 @@ can be specified by DATASETS_PATH.
 from iptk import DatasetStore
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
+from random import shuffle
 import sys
 import os
 import re
